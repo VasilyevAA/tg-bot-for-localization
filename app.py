@@ -22,10 +22,6 @@ TG_BOT = Bot(TOKEN)
 dp = Dispatcher()
 
 
-def solve_doc_from_msg(msg: Message) -> str:
-    return
-
-
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
     """
