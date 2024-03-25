@@ -6,6 +6,8 @@ import logging
 from os import getenv
 from pathlib import Path
 
+from expiringdict import ExpiringDict
+
 from aiogram.filters import CommandStart
 from aiogram.utils.markdown import hbold
 from aiogram import Bot, Dispatcher, types
@@ -17,6 +19,16 @@ from utils.locale_svc import prepare_default_xlsx_file, get_back_prepared_xlsx_f
 # Bot token can be obtained via https://t.me/BotFather
 TOKEN = getenv("TG_BOT_TOKEN")
 TG_BOT = Bot(TOKEN)
+USER_ACTION_CACHE = ExpiringDict(max_len=1000, max_age_seconds=120)
+
+
+AVAILABLE_ACTIONS = {
+    '1': 'load zip with json to xlsx',
+    '2': 'load proofreaded zip xslx to new_json',
+    '3': 'load proofreaded xlsx to new_json',
+    '0': 'Clear action cache for user',
+}
+
 
 # All handlers should be attached to the Router (or Dispatcher)
 dp = Dispatcher()
@@ -36,11 +48,26 @@ async def command_start_handler(message: Message) -> None:
     await message.answer(f"Hello, {hbold(message.from_user.full_name)}!")
 
 
-async def is_message_with_file(message: types.Message, err_answer_str: str):
-    if message.document is None:
-        await message.answer(err_answer_str)
-        return False
-    return True
+async def retrieve_action_and_check_file(message: types.Message) -> [str, bool]:
+    action = message.text or message.html_text or message.caption
+
+    if action not in AVAILABLE_ACTIONS:
+        return action, False
+
+    if message.document and action:
+        return action, True
+
+    if message.document is None and action:
+        USER_ACTION_CACHE[message.from_user.id] = action
+        await message.answer(f"Wait file for processing: {AVAILABLE_ACTIONS.get(action)}")
+        return action, False
+
+    if message.document and not action:
+        action = USER_ACTION_CACHE.get(message.from_user.id)
+        await message.answer(f"File is processing with action: {AVAILABLE_ACTIONS.get(action)}")
+        return action, True
+
+    return action, False
 
 
 def detect_root_localization_folder(path: Path, deep=0) -> Path:
@@ -73,36 +100,28 @@ async def upload_file_to_tg(message: types.Message, file_path: Path):
 
 @dp.message()
 async def echo_handler(message: types.Message) -> None:
-    action = message.text or message.html_text or message.caption
     with tmp_datafolder() as tmp_folder:
-        match action:
-            case "1":
-                if await is_message_with_file(message, "Don't receive zip with data for prepare xlsx from json"):
-                    prepared_localization_path = await download_and_unzip_file(message, tmp_folder)
+        action, is_file_contains = await retrieve_action_and_check_file(message)
+        if is_file_contains:
+            prepared_localization_path = await download_and_unzip_file(message, tmp_folder)
+            match action:
+                case "1":
                     prepare_default_xlsx_file(prepared_localization_path)
                     new_zip_file_path = shutil.make_archive(tmp_folder / (message.document.file_name[:-4] + "_prepared"), 'zip', prepared_localization_path)
                     await upload_file_to_tg(message, new_zip_file_path)
-            case "2":
-                if await is_message_with_file(message, "Don't receive zip with data for prepare xlsx to new json"):
-                    prepared_localization_path = await download_and_unzip_file(message, tmp_folder)
+                case "2":
                     get_back_prepared_xlsx_files_to_json(prepared_localization_path)
                     new_zip_file_path = shutil.make_archive(tmp_folder / (message.document.file_name[:-4] + "_finally"), 'zip', prepared_localization_path)
                     await upload_file_to_tg(message, new_zip_file_path)
-            case "3":
-                if await is_message_with_file(message, "Don't receive xlsx file for make new json"):
-                    prepared_localization_path = await download_and_unzip_file(message, tmp_folder)
+                case "3":
                     new_json_path = (prepared_localization_path / f"../{prepared_localization_path.stem}_new.json").resolve()
                     get_back_single_xlsx_file_to_json(prepared_localization_path, new_json_path)
                     await upload_file_to_tg(message, new_json_path)
-            # case "4":
-            #     await message.answer("4")
-            case _:
-                answer = [
-                    '1 - load zip with json to xlsx',
-                    '2 - load proofreaded zip xslx to new_json',
-                    '3 - load proofreaded xlsx to new_json',
-                ]
-                await message.answer(',\n'.join(answer))
+        elif action == "0":
+            del USER_ACTION_CACHE[message.from_user.id]
+            await message.answer(f"Clear cache for user: {message.from_user.id} - {message.from_user.full_name}")
+        elif action not in AVAILABLE_ACTIONS:
+            await message.answer(',\n'.join([f"{k} - {v}" for k, v in AVAILABLE_ACTIONS.items()]))
 
 
 async def main() -> None:

@@ -213,6 +213,20 @@ files = [
 ]
 
 [[package]]
+name = "expiringdict"
+version = "1.2.2"
+description = "Dictionary with auto-expiring values for caching purposes"
+optional = false
+python-versions = "*"
+files = [
+    {file = "expiringdict-1.2.2-py3-none-any.whl", hash = "sha256:09a5d20bc361163e6432a874edd3179676e935eb81b925eccef48d409a8a45e8"},
+    {file = "expiringdict-1.2.2.tar.gz", hash = "sha256:300fb92a7e98f15b05cf9a856c1415b3bc4f2e132be07daa326da6414c23ee09"},
+]
+
+[package.extras]
+tests = ["coverage", "coveralls", "dill", "mock", "nose"]
+
+[[package]]
 name = "frozenlist"
 version = "1.4.1"
 description = "A list-like structure which implements collections.abc.MutableSequence"
@@ -689,4 +703,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "fef9972e81b6994408f673a344609cec1196d27b46e488a3d22ea1b125c6402b"
+content-hash = "42f1bc80c0e950f8175239116db1fd17c7e3bb15633c30058446f1d7cdc2e257"
