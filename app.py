@@ -51,7 +51,7 @@ async def command_start_handler(message: Message) -> None:
 async def retrieve_action_and_check_file(message: types.Message) -> [str, bool]:
     action = message.text or message.html_text or message.caption
 
-    if action not in AVAILABLE_ACTIONS:
+    if action and action not in AVAILABLE_ACTIONS:
         return action, False
 
     if message.document and action:
